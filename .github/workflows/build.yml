@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Lean and the Mathlib cache (no build yet)
+        uses: leanprover/lean-action@v1
+        with:
+          use-mathlib-cache: true
+          build: false
+      - name: Build the cases one at a time (the kernel computations need up to 5 GB each)
+        run: |
+          for m in Points SanityBase Casekagome Case3342 Case488 Case3122 Casef2b Case3 Case346 Case4612; do
+            echo "::group::$m"; lake build LeanResidy.$m; echo "::endgroup::"
+          done
+          lake build
+      - name: Print the axioms of the main theorems
+        run: lake env lean Axioms.lean | tee axioms.txt
+      - name: Check that only the standard axioms are used
+        run: |
+          n_print=$(grep -c '^#print axioms' Axioms.lean)
+          n_ok=$(grep -cE "(depends on axioms: \[(propext, )?(Classical.choice, )?Quot.sound\]|does not depend on any axioms)$" axioms.txt || true)
+          echo "theorems: $n_print, with standard axioms only: $n_ok"
+          if [ "$n_print" != "$n_ok" ]; then
+            echo "Some theorem uses a non-standard axiom (or sorryAx):"; grep -vE "(\[(propext, )?(Classical.choice, )?Quot.sound\]|does not depend on any axioms)$" axioms.txt; exit 1
+          fi
+      - name: Check that there is no sorry, admit or native_decide
+        run: |
+          if grep -rnw --include='*.lean' -e 'sorry' -e 'admit' -e 'native_decide' LeanResidy LeanResidy.lean; then
+            echo "Found sorry/admit/native_decide"; exit 1
+          fi
+      - name: Check that STATEMENTS.md quotes the source verbatim
+        run: python3 scripts/check_statements.py
