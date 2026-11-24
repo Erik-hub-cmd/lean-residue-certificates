@@ -6,7 +6,7 @@ a verbatim substring of some file in LeanResidy/. Exit code 1 on any mismatch.
 """
 import pathlib, re, sys
 root = pathlib.Path(__file__).resolve().parent.parent
-src = {p: p.read_text() for p in (root / 'LeanResidy').glob('*.lean')}
+src = {p: p.read_text() for p in (root / 'LeanResidy').rglob('*.lean')}
 md = (root / 'STATEMENTS.md').read_text()
 blocks = re.findall(r'```lean\n(.*?)```', md, re.S)
 bad = n = 0

@@ -40,8 +40,9 @@ integrability argument that removes the poles at `0` and `∞` from `ρ_f`, the 
 | `C488` | 4.8² | [E3] | 1 | `r² = −1, s² = −2` | 4 | 16 |
 | `Cf2b` | [3.4.3.12; 3.12²] | [E3] | 1 | `r² = −1, s² = −35` | 8 | 64 |
 
-Not included: [3².6²; 3.6.3.6] of [E3] (its field `ℚ(i, √2, √3)` has degree 8), and all results with variable
-conductances in [E3], section "General conductances".
+[3².6²; 3.6.3.6] of [E3] (field `ℚ(i, √2, √3)` of degree 8) and 3.12² and 4.8² with a variable conductance
+([E3], section "General conductances") are in the extension `LeanResidy.X`, §7. Not included: the families with two
+independent conductance ratios ([3².6²; 3.6.3.6] and [3.4.3.12; 3.12²] with all conductances).
 
 The data of each case (`V`, `E`, `D`, `A`, `pts`, `ex1`, `ex2`, `t00…t11`, `ev1`, `ev2`, `PFfinL`, `PFinfL`) are in
 `LeanResidy/Data<case>.lean`, generated from the Python code of the papers. **Lean does not trust them**: if any
@@ -217,3 +218,181 @@ above sufficient.
 * Lemma `lem:poles`(b): that the poles of `ρ_f` at `0` and `∞` cancel and `Σ c_{q,1} = 0` (an analytic
   integrability argument).
 * The integration and Baker's theorem.
+
+## 7. Extension `LeanResidy.X`: three further cases (added and reviewed 2026-11-24)
+
+`LeanResidy/X/` adds the three cases that §1 lists as not included in the first version. The files of §1–§6 are
+unchanged; `X/` reuses `Basic.lean` and `Points.lean`.
+
+| namespace | lattice | paper | conductances | coefficients | `V` | entries |
+|---|---|---|---|---|---|---|
+| `X.Cf2a` | [3².6²; 3.6.3.6] | [E3] | 1 | `ℚ(r, s, t)`, `r² = −1, s² = 2, t² = 3` | 3 | 9 |
+| `X.C3122t` | 3.12² | [E3], Theorem `thm:3122t` | 1 on triangle edges, `u` on dodecagon–dodecagon edges, **every** `u ≠ 0, −3/2` | `ℚ(r, s)(u)`, `r² = −3, s² = −1` | 6 | 36 |
+| `X.C488u` | 4.8² | [E3], Theorem `thm:488t` | `1 − c` on square edges, `2c` on octagon–octagon edges, `c = (u + u⁻¹)/2`, **every** `u` outside a finite list | `ℚ(r, s)(u)`, `r² = −1, s² = −2` | 4 | 16 |
+
+In [E3] the parameter of 3.12² is called `t`; for 4.8², `u = e^{iθ_t}` with `cos θ_t = t/(2 + t)`, and the
+conductances `(1 − c, 2c)` are proportional to `(1, t)` (proof of Theorem `thm:488t`).
+
+### 7.1 Definitions
+
+The coefficients now lie in a computable model `K` with an interpretation `vK : K → F` that respects the operations
+(`Sound vK`, the same notion as in `Basic.lean`). The definitions of §2 are repeated with coefficients in `K`:
+
+```lean
+abbrev LPK (K : Type) := List ((ℤ × ℤ) × K)
+/-- kant `(i, j, n₁, n₂, w)` med vikt `w ∈ K` -/
+abbrev EdgeK (K : Type) := ℕ × ℕ × ℤ × ℤ × K
+def levalK (vK : K → F) (L : LPK K) (x1 x2 : F) : F :=
+  (L.map fun t => vK t.2 * x1 ^ t.1.1 * x2 ^ t.1.2).sum
+abbrev EdgeK (K : Type) := ℕ × ℕ × ℤ × ℤ × K
+def edgeCK (vK : K → F) (x1 x2 : F) (i j : ℕ) (e : EdgeK K) : F :=
+  let a := e.1; let b := e.2.1; let n1 := e.2.2.1; let n2 := e.2.2.2.1; let w : F := vK e.2.2.2.2
+  (if i = a ∧ j = a then w else 0) + (if i = b ∧ j = b then w else 0)
+    - (if i = a ∧ j = b then w * (x1 ^ n1 * x2 ^ n2) else 0)
+    - (if i = b ∧ j = a then w * (x1 ^ n1 * x2 ^ n2)⁻¹ else 0)
+def lapMatK (vK : K → F) (V : ℕ) (E : List (EdgeK K)) (x1 x2 : F) : Matrix (Fin V) (Fin V) F :=
+  fun i j => (E.map (edgeCK vK x1 x2 i j)).sum
+def lmatK (vK : K → F) (V : ℕ) (A : ℕ → ℕ → LPK K) (x1 x2 : F) : Matrix (Fin V) (Fin V) F :=
+  fun i j => levalK vK (A i j) x1 x2
+def trLK (t00 t01 t10 t11 : ℤ) (L : LPK K) : LPK K :=
+  L.map fun t => ((t00 * t.1.1 + t01 * t.1.2, t10 * t.1.1 + t11 * t.1.2), t.2)
+def eulK (L : LPK K) : LPK K := L.map fun t => (t.1, Comp.mul (Comp.ofQ (t.1.2 : ℚ)) t.2)
+```
+These are `leval`, `edgeC`, `lapMat`, `lmat`, `trL`, `eul` of §2 with `(t.2 : F)` replaced by `vK t.2`. `xpar`,
+`dlogv` and `pfval` are the definitions of §2 (unchanged). Per case, `data : Case K` holds the data; `data.A k l`,
+`data.DT`, `data.pfin`, `data.pinf`, `data.iz` are as in §2, and the punctures in `F` are
+```lean
+def qv (vK : K → F) (c : Case K) : List F := c.pts.map vK
+```
+
+The models and their interpretations:
+```lean
+def val (v : C → F) (t : F) (p : Quad C a) : F := v p.x + v p.y * t
+abbrev Z8 (A B : ℤ) (c : ℚ) := Quad (Z4 A B) (⟨c, 0, 0, 0⟩ : Z4 A B)
+def Z8.val {A B : ℤ} {c : ℚ} {F : Type} [Field F] (r s t : F) : Z8 A B c → F :=
+  Quad.val (Z4.val r s) t
+def val (v : C → F) (z : F) (x : Fr C pts) : F := P.val v z x.num / dval v z pts x.k
+```
+`Quad C a` stores `x + y·t` with `t² = a`; `Z8` is `ℚ(r, s)(t)`. `Fr C pts` stores a rational function
+`num(u) / ∏ (u − ptsᵢ)^{kᵢ}` (numerator as a coefficient list, evaluated by Horner's rule `P.val`). The three
+interpretations:
+```lean
+def vK : K → F := Z8.val r s t
+def vK : K → F := Fr.val (Z4.val r s) u
+def vK : K → F := Fr.val (Z4.val r s) u
+abbrev tpts : List (Z4 (-3) (-1)) := [(⟨(0 : ℚ), 0, 0, 0⟩ : Z4 (-3) (-1)), (⟨(-3/2 : ℚ), 0, 0, 0⟩ : Z4 (-3) (-1))]
+```
+For 4.8², `tpts` is the list `0, ±1, ±i, ±c, ±ic` for `c = 2, …, 17` (69 points in `ℚ(i, √−2)`; the points
+`c ≥ 2` are needed because the punctures `±u, ±iu` move with `u` and must avoid the check points `z = 2, …, 16`).
+
+### 7.2 The main theorems
+
+Hypotheses (section variables): for `Cf2a`, `hr : r ^ 2 = ((-1 : ℤ) : F)`, `hs : s ^ 2 = ((2 : ℤ) : F)`,
+`ht : t ^ 2 = ((3 : ℚ) : F)`; for `C3122t`, `hr : r ^ 2 = ((-3 : ℤ) : F)`, `hs : s ^ 2 = ((-1 : ℤ) : F)`,
+`hu : ∀ p ∈ tpts, u ≠ Z4.val r s p`; for `C488u`, `hr : r ^ 2 = ((-1 : ℤ) : F)`, `hs : s ^ 2 = ((-2 : ℤ) : F)` and
+the same `hu`. Statements for `Cf2a` (for the other two, replace `vK r s t` by `vK r s u`; the text is otherwise
+identical):
+
+```lean
+theorem adjugate (x1 x2 : F) (h1 : x1 ≠ 0) (h2 : x2 ≠ 0) :
+    lapMatK (vK r s t) data.V data.E x1 x2 * lmatK (vK r s t) data.V data.A x1 x2 =
+      levalK (vK r s t) data.D x1 x2 • (1 : Matrix (Fin data.V) (Fin data.V) F)
+theorem curve_ok : data.curveCheck = true
+theorem partial_fractions (k l : Fin data.V) (z : F) (hz : ∀ q ∈ qv (vK r s t) data, z ≠ q) :
+    levalK (vK r s t) (data.A k l) (xpar (qv (vK r s t) data) data.ex1 z)
+        (xpar (qv (vK r s t) data) data.ex2 z) * dlogv (qv (vK r s t) data) data.ev1 z =
+      levalK (vK r s t) (eulK data.DT) (xpar (qv (vK r s t) data) data.ev1 z)
+          (xpar (qv (vK r s t) data) data.ev2 z) *
+        pfval (qv (vK r s t) data) ((data.pfin k l).map fun t' => (t'.1, t'.2.1, vK r s t t'.2.2))
+          ((data.pinf k l).map fun t' => (t'.1, vK r s t t'.2)) z
+```
+These are Theorems A, B, C of §3. For `Cf2a` they hold for **all eight** choices of `r, s, t` (all Galois
+conjugates of the parametrisation over `ℚ(i, √2, √3)`, as used by Lemmas `lem:mob` and `lem:perm` of [E3]). For
+`C3122t` and `C488u` they hold **identically in the conductance parameter `u`** (outside `tpts`). For 3.12², [E3]
+verifies the partial-fraction identity at 16 values of `t` and extends by polynomiality; Lean proves it for all `t`
+directly. For 4.8², this is the symbolic computation in `u` of step (1) of the proof of Theorem `thm:488t`.
+(4.8²'s Theorem B is proved by the point method too, `curve_gen_pts`; the statement is the same.)
+
+**[check]** The hypothesis `hu` is a finite list of excluded values. It holds for every `t > 0` (3.12²) and for
+every `u` on the unit circle other than `±1, ±i` (4.8², `hu_unit` below), which covers `u = e^{iθ_t}`,
+`θ_t ∈ (0, π/2)`.
+
+### 7.3 Sanity theorems (`X/Sanity<case>.lean`, written in the review)
+
+The theorems of §4, for each of the three namespaces (`T_det`, `x_eq_vT`, `curve_v`, `green`, `integrand`,
+`pinf_nil`, `pfin_zero_simple`, `D_ne_zero`, `eul_ne_zero_at_2`), now with the parameter. In addition, `weights`
+and `D_eq` tie the data to the paper directly in Lean.
+
+```lean
+theorem weights : data.E.map (fun e => (e.1, e.2.1, vK r s u e.2.2.2.2)) =
+    [(0, 4, 1), (0, 3, u), (0, 2, 1), (1, 2, u), (1, 5, 1), (1, 3, 1), (2, 4, 1), (4, 5, u), (3, 5, 1)]
+theorem weights : data.E.map (fun e => (e.1, e.2.1, e.2.2.1, e.2.2.2.1, vK r s u e.2.2.2.2)) =
+    [(0, 1, 0, 0, 1 - (u + u⁻¹) / 2), (1, 2, 0, 0, 1 - (u + u⁻¹) / 2), (2, 3, 0, 0, 1 - (u + u⁻¹) / 2),
+      (3, 0, 0, 0, 1 - (u + u⁻¹) / 2), (0, 2, 1, 0, 2 * ((u + u⁻¹) / 2)), (1, 3, 0, 1, 2 * ((u + u⁻¹) / 2))]
+```
+The conductances sit where [E3] says: for 3.12², `u` exactly on the three edges not in a triangle (the triangles are
+`0, 2, 4` and `1, 3, 5`); for 4.8², `1 − c` on the square `0, 1, 2, 3` and `2c` on the octagon–octagon edges `0 → 2`
+in cell `(1, 0)` and `1 → 3` in cell `(0, 1)` (as in `lat.py`). For `Cf2a` all six conductances are `1`.
+
+```lean
+theorem D_eq (x1 x2 : F) (h1 : x1 ≠ 0) (h2 : x2 ≠ 0) :
+    levalK (vK r s t) data.D x1 x2 =
+      -(x1 ^ 2 * x2 ^ 2 + 10 * x1 ^ 2 * x2 + x1 ^ 2 + 6 * x1 * x2 ^ 2 - 36 * x1 * x2 + 6 * x1 + x2 ^ 2 +
+        10 * x2 + 1) / (x1 * x2)
+theorem D_eq (x1 x2 : F) (h1 : x1 ≠ 0) (h2 : x2 ≠ 0) :
+    levalK (vK r s u) data.D x1 x2 =
+      -3 * u ^ 2 * (2 * u + 3) * (x1 + x1⁻¹ + x2 + x2⁻¹ + x1 * x2⁻¹ + x1⁻¹ * x2 - 6)
+theorem D_eq (x1 x2 : F) (h1 : x1 ≠ 0) (h2 : x2 ≠ 0) :
+    let c := (u + u⁻¹) / 2
+    let a := 1 - c
+    let b := 2 * c
+    let W := 2 * a ^ 2 * b * (2 * a + b)
+    let Dd := a ^ 2 * b ^ 2
+    levalK (vK r s u) data.D x1 x2 =
+      (2 * W + 2 * W + 4 * Dd) - W * (x1 + x1⁻¹) - W * (x2 + x2⁻¹) - Dd * (x1 + x1⁻¹) * (x2 + x2⁻¹)
+```
+`D` is, explicitly, the Bloch determinant of [E3]: for [3².6²; 3.6.3.6] the polynomial printed in section "The
+lattices and their train tracks" (with sign −1); for 3.12², `−3u²(2u + 3)·P_△` as in Proposition
+`prop:weights`(a) with `(w₀, w₁) = (1, u)`; for 4.8², `P_{W,D}` of Proposition `prop:weights`(b) with
+`(a, b) = (1 − c, 2c)`.
+
+```lean
+theorem D_ne_zero : levalK (vK r s u) data.D (-1) (-1) ≠ 0
+theorem eul_ne_zero_at_2 :
+    levalK (vK r s u) (eulK data.DT) (xpar (qv (vK r s u) data) data.ev1 ((2 : ℚ) : F))
+      (xpar (qv (vK r s u) data) data.ev2 ((2 : ℚ) : F)) ≠ 0
+theorem eul_ne_zero_at_2 (hQ : (u - 4 * r) * (u ^ 2 + (-32/17 + 8/17 * r) * u - 4 * r) ≠ 0) :
+    levalK (vK r s u) (eulK data.DT) (xpar (qv (vK r s u) data) data.ev1 ((2 : ℚ) : F))
+      (xpar (qv (vK r s u) data) data.ev2 ((2 : ℚ) : F)) ≠ 0
+```
+`D ≢ 0` and the denominator of the integrand is not identically zero along the curve, **for every allowed value of
+the parameter** (not only for one). For 4.8² the denominator at `z = 2` vanishes also at the three roots of an
+explicit cubic `Q(u)` (moduli 4, ≈1.53, ≈2.62), which is therefore a hypothesis; `hQ_unit` shows it holds on the
+unit circle.
+
+```lean
+theorem hu_unit (s : ℂ) (u : ℂ) (h1 : Complex.normSq u = 1) (hp1 : u ≠ 1) (hm1 : u ≠ -1) (hpi : u ≠ I)
+    (hmi : u ≠ -I) : ∀ p ∈ tpts, u ≠ Z4.val I s p
+theorem hQ_unit (u : ℂ) (h1 : Complex.normSq u = 1) :
+    (u - 4 * I) * (u ^ 2 + (-32/17 + 8/17 * I) * u - 4 * I) ≠ 0
+```
+In `ℂ` with `r = i`: every `u` with `|u| = 1`, `u ≠ ±1, ±i`, satisfies the hypothesis `hu` of the main theorems
+and the hypothesis of `eul_ne_zero_at_2`. (`X/Sanity.lean`, by the author of the code, shows the hypotheses at one
+point each: `r = i, s = √2, t = √3`; `u = 1`; `u = (3 + 4i)/5`.)
+
+### 7.4 Checked outside Lean (independent Python code, parsing the `.lean` data files)
+
+* `D = det M(x)` **exactly** (symbolically in `x` and in the parameter), and `A = adj M(x)`, for all three cases.
+* The punctures and their exponents are exactly those of eq. `xz` of [E3] with the tracks of the table of exact
+  train tracks (`[3².6²; 3.6.3.6]`: `(1,0;1)`, `(1,0;ζ⁴)`, `(0,1;ζ¹⁷)`, `(0,1;ζ²³)`, `ζ = e^{iπ/12}`; 3.12²: those of
+  3.6.3.6; 4.8²: `(1,0;1)`, `(1,0;u)`, `(0,1;−i)`, `(0,1;−iu)`); `T` as in the table of proof data.
+* Theorems B and C evaluated numerically at a random `z` (3.12² at `t = 7/3`, 4.8² at `u = e^{0.7i}`): agreement to
+  `10⁻¹³`.
+
+### 7.5 Not formalised (in addition to §6)
+
+For the weighted cases: the analytic arguments of Theorems `thm:3122t` and `thm:488t` (polynomiality in `t` of
+`s(t)R`, the extension of the certified cycle data from `t = 1` to an interval, real-analyticity and the identity
+theorem in `t`). For [3².6²; 3.6.3.6]: Lemma `lem:mob` (the Möbius maps `m_g`) and Lemma `lem:perm`. The two-parameter
+families ([3².6²; 3.6.3.6] and [3.4.3.12; 3.12²] with all conductances) are not included: one point check already
+needs more than 11 GB in the kernel with this method.
