@@ -396,3 +396,189 @@ For the weighted cases: the analytic arguments of Theorems `thm:3122t` and `thm:
 theorem in `t`). For [3².6²; 3.6.3.6]: Lemma `lem:mob` (the Möbius maps `m_g`) and Lemma `lem:perm`. The two-parameter
 families ([3².6²; 3.6.3.6] and [3.4.3.12; 3.12²] with all conductances) are not included: one point check already
 needs more than 11 GB in the kernel with this method.
+
+## 8. Two conductance parameters: the Kronecker model (added 2026-11-25)
+
+Files `LeanResidy/X/Kron.lean`, `FrG.lean`, `KronSanity.lean`, `KronSanityUnit.lean`, `Dataf2awK.lean`,
+`Casef2awK.lean`, `Dataf2bwK.lean`, `Casef2bwK.lean`. The generic framework (`X/Generic.lean`, `X/Case.lean`) is
+unchanged; only the coefficient model is new.
+
+### 8.0 In one paragraph
+
+For the two lattices with **two** weight parameters, [3².6²; 3.6.3.6] (`Cf2awK`, a = P₁ = pq, b = P₂ = p/q)
+and [3.4.3.12; 3.12²] (`Cf2bwK`, a = u, b = r), the same three identities as in the one-parameter cases are
+machine-checked: the adjugate identity M·A = D·I (Sats A), the curve D(x(z)) = 0 (Sats B) and the
+partial-fraction identity for all V² entries (Sats C). They hold for **every** field F of characteristic 0,
+every choice of roots r² = −1, s² = −2, and **every** a, b ∈ F at which no factor of the finite list `Dl`
+vanishes. `Dl` contains the genuine denominators and, in addition, factors k + e·m (|k| ≥ 2, e ∈ {±1, ±r},
+m ∈ {ab, a, b} resp. {u}) that only come from the control points z = 2, 3, … . The theorems in §8.4
+show that the whole physical parameter region satisfies this hypothesis.
+
+### 8.1 The coefficient model
+
+A polynomial in a, b with coefficients in ℤ[r, s] is stored as four packed integers
+N = Σ c_ij · Bb^(i + S·j), Bb = 2^Kb, with an ℓ¹ bound β, an a-degree bound da, a positive integer
+denominator den, the polynomial itself as a delayed "ghost" `G` (never computed by the kernel), and a proof `h`
+that these agree.
+
+```lean
+def gpos (S : ℕ) (e : ℕ × ℕ) : ℕ := e.1 + S * e.2
+```
+```lean
+def pkc (Bb S : ℕ) (f : I4 → ℤ) (P : GP) : ℤ := (P.map fun t => f t.2 * ((Bb ^ gpos S t.1 : ℕ) : ℤ)).sum
+```
+```lean
+def pkI (Bb S : ℕ) (P : GP) : I4 := ⟨pkc Bb S I4.a P, pkc Bb S I4.b P, pkc Bb S I4.c P, pkc Bb S I4.d P⟩
+```
+```lean
+def PInv (Kb S : ℕ) (N : I4) (den β da : ℕ) (P : GP) : Prop :=
+  N = pkI (2 ^ Kb) S P ∧ gl1 P ≤ β ∧ (∀ t ∈ P, t.1.1 ≤ da) ∧ 0 < den
+```
+```lean
+structure PK (A B : ℤ) (Kb S : ℕ) where
+  N : I4
+  den : ℕ
+  β : ℕ
+  da : ℕ
+  /-- spökpolynomet, fördröjt (räknas aldrig ut av kärnan eller av `#eval`) -/
+  G : Unit → GP
+  h : PInv Kb S N den β da (G ())
+```
+
+The kernel's zero test reads only the packed numbers and the bounds:
+
+```lean
+def isZero (x : PK A B Kb S) : Bool :=
+  I4.isZ x.N && decide (2 * x.β < 2 ^ Kb) && decide (x.da < S)
+```
+
+The interpretation (`I4.val r s x = x.a + x.b·r + x.c·s + x.d·(r·s)`):
+
+```lean
+def gval (a b r s : F) (P : GP) : F := (P.map fun t => I4.val r s t.2 * a ^ t.1.1 * b ^ t.1.2).sum
+```
+```lean
+def val (a b r s : F) (x : PK A B Kb S) : F := gval a b r s x.P / x.den
+```
+
+**Kronecker lemma.** Packed value 0, ℓ¹ bound < Bb/2 and a-degree < S force the polynomial to vanish:
+
+```lean
+theorem kron_zero (Kb S : ℕ) (P : GP) (β da : ℕ) (hN : pkI (2 ^ Kb) S P = I4.zero)
+    (hl : gl1 P ≤ β) (hd : ∀ t ∈ P, t.1.1 ≤ da) (hβ : 2 * β < 2 ^ Kb) (hS : da < S)
+    (a b r s : F) : gval a b r s P = 0
+```
+
+**Soundness** (`Sound` from `Basic.lean`: the interpretation respects 0, +, ·, −, rationals, and `isZero`):
+
+```lean
+theorem sound (a b r s : F) (hr : r ^ 2 = A) (hs : s ^ 2 = B) :
+    Sound (val (A := A) (B := B) (Kb := Kb) (S := S) a b r s)
+```
+
+Denominators: `num / ∏ dlⱼ^kⱼ` for a fixed list `dl`.
+
+```lean
+structure FrG (C : Type) (dl : List C) where
+  num : C
+  k : List ℕ
+```
+```lean
+def dvalG (v : C → F) : List C → List ℕ → F
+  | q :: ps, n :: ks => v q ^ n * dvalG v ps ks
+  | _, _ => 1
+```
+```lean
+def val (v : C → F) (x : FrG C dl) : F := v x.num / dvalG v dl x.k
+```
+```lean
+theorem sound {v : C → F} (S : Sound v) (hz : ∀ q ∈ dl, v q ≠ 0) : Sound (val (dl := dl) v)
+```
+
+### 8.2 The three main theorems (identical text in `Cf2awK` and `Cf2bwK`)
+
+Context: `variable {F : Type} [Field F] [CharZero F] (a b r s : F)` and
+
+```lean
+variable (hr : r ^ 2 = ((-1 : ℤ) : F)) (hs : s ^ 2 = ((-2 : ℤ) : F))
+  (hD : ∀ d ∈ Dl, PK.val a b r s d ≠ 0)
+```
+```lean
+def vK : K → F := FrG.val (PK.val a b r s)
+```
+```lean
+theorem adjugate (x1 x2 : F) (h1 : x1 ≠ 0) (h2 : x2 ≠ 0) :
+    lapMatK (vK a b r s) data.V data.E x1 x2 * lmatK (vK a b r s) data.V data.A x1 x2 =
+      levalK (vK a b r s) data.D x1 x2 • (1 : Matrix (Fin data.V) (Fin data.V) F)
+```
+```lean
+theorem curveDeg_ok : data.curveDeg = true := by decide +kernel
+def CP (j : ℕ) : Bool := data.curveAt ((j : ℚ) + 2)
+theorem cp_0 : CP 0 = true := by decide +kernel
+theorem cp_1 : CP 1 = true := by decide +kernel
+theorem cp_2 : CP 2 = true := by decide +kernel
+theorem cp_3 : CP 3 = true := by decide +kernel
+theorem cp_4 : CP 4 = true := by decide +kernel
+theorem cp_5 : CP 5 = true := by decide +kernel
+theorem cp_6 : CP 6 = true := by decide +kernel
+theorem cp_7 : CP 7 = true := by decide +kernel
+theorem cp_8 : CP 8 = true := by decide +kernel
+theorem cp_all : ∀ j < data.dmaxC + 1, data.curveAt ((j : ℚ) + 2) = true
+```
+```lean
+theorem partial_fractions (k l : Fin data.V) (z : F) (hz : ∀ q ∈ qv (vK a b r s) data, z ≠ q) :
+    levalK (vK a b r s) (data.A k l) (xpar (qv (vK a b r s) data) data.ex1 z)
+        (xpar (qv (vK a b r s) data) data.ex2 z) * dlogv (qv (vK a b r s) data) data.ev1 z =
+      levalK (vK a b r s) (eulK data.DT) (xpar (qv (vK a b r s) data) data.ev1 z)
+          (xpar (qv (vK a b r s) data) data.ev2 z) *
+        pfval (qv (vK a b r s) data) ((data.pfin k l).map fun t' => (t'.1, t'.2.1, vK a b r s t'.2.2))
+          ((data.pinf k l).map fun t' => (t'.1, vK a b r s t'.2)) z
+```
+
+Plain reading: as in §3, with all coefficients (edge weights, adjugate, determinant,
+punctures, residues) now rational functions of the two parameters a, b, evaluated through `vK`.
+
+* `Cf2awK`: edge weights 1 (four edges from vertex 0), w₂ = (1 + c₂)/(1 − c₂) = −(a+b)²/(a−b)² and
+  w₀ = (1 − c₁)/(c₁ + c₂) = −(ab−1)²/((a²+1)(b²+1)), c₁ = (ab + 1/ab)/2, c₂ = (a/b + b/a)/2
+  (smal_g2a/BEVIS.md §0). Punctures ±1, ±ab, ±ra, ±rb. Kb = 512, S = 64, 99 factors in `Dl`.
+* `Cf2bwK`: weights 2c(1+r), 2cr(1+r), r(1 − c(1+r)), c = (u + 1/u)/2 (artikel 3, proof of `thm:f2bt`);
+  punctures ±1, ±u, ±i, ±iu. Kb = 1024, S = 64, 74 factors in `Dl`.
+
+### 8.3 Non-vacuity at one rational point (`Casef2awK`, `Casef2bwK`)
+
+```lean
+theorem hD_satisfiable (hr : r ^ 2 = ((-1 : ℤ) : F)) (hs : s ^ 2 = ((-2 : ℤ) : F)) :
+    ∀ d ∈ Dl, PK.val (((2 / 7 : ℚ)) : F) (((3 / 11 : ℚ)) : F) r s d ≠ 0
+```
+
+At a = 2/7, b = 3/11 no factor vanishes, for every choice of roots (kernel check of norms in ℚ(r, s),
+`KronSanity.lean`).
+
+### 8.4 The physical region (`X/KronSanityUnit.lean`, written in a separate check)
+
+```lean
+theorem f2a_hD_unit (a b r s : ℂ) (hr : r ^ 2 = ((-1 : ℤ) : ℂ)) (ha : normSq a = 1) (hb : normSq b = 1)
+    (h1 : a ≠ b) (h2 : a ≠ -b) (h3 : a ^ 2 ≠ -1) (h4 : b ^ 2 ≠ -1) (h5 : a * b ≠ -1) :
+    ∀ d ∈ Cf2awK.Dl, PK.val a b r s d ≠ 0
+```
+```lean
+theorem f2b_hD_unit (a b r s : ℂ) (hr : r ^ 2 = ((-1 : ℤ) : ℂ)) (ha : normSq a = 1)
+    (h1 : a ≠ 1) (h2 : a ≠ -1) (h3 : a ^ 2 ≠ -1) (h4 : b ≠ 0) (h5 : b ≠ -1) :
+    ∀ d ∈ Cf2bwK.Dl, PK.val a b r s d ≠ 0
+```
+
+Plain reading: in ℂ (any s), `hD` holds for all a, b on the unit circle with a ≠ ±b, a², b² ≠ −1, ab ≠ −1
+(f2a), resp. for all u on the unit circle with u ≠ ±1, u² ≠ −1 and all b ≠ 0, −1 (f2b). The physical regions
+(f2a: ab = e^{iφ₁}, a/b = e^{iφ₂}, φ₁, φ₂ ∈ (0, π), φ₁ + φ₂ < π; f2b: u = e^{iθ}, θ ∈ (0, π/2), b > 0)
+lie inside, so the theorems of §2 apply on the whole physical region.
+
+### 8.5 Checked outside Lean (2026-11-25, separate Python code)
+
+D = det M exactly, with separately written Python code (symbolic in x₁, x₂, a, b, and in six random exact points per case). With M·A = D·I in Lean and D ≢ 0 this gives A = adj M. Weights and edge classes compared
+with the tiling data and the articles.
+
+### 8.6 Not formalised
+
+As in §6: D = det M (only outside Lean), `dlogv`/`eulK` are definitions, and the analysis
+(Γ, integer data, Baker, the integral) is by hand. The coefficients come from exact interpolation of `run.main`
+on a grid; Lean does not rely on it (a wrong coefficient makes a check fail).

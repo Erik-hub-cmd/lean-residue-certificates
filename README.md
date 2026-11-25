@@ -24,7 +24,7 @@ the statements are not vacuous, and the points to compare with the papers.
 
 * Lean `v4.37.0-rc1`, Mathlib commit [`81cb93d`](https://github.com/leanprover-community/mathlib4/commit/81cb93dd9daa2d3d9cf275707da390fb66adadb0).
 * No `sorry`, no `native_decide`, no new axioms. All heavy computations are done by the Lean kernel (`decide +kernel`).
-* `lake env lean Axioms.lean` prints the axioms of the 33 main theorems and 105 sanity theorems; each depends only on
+* `lake env lean Axioms.lean` prints the axioms of the 33 main theorems and 105 sanity theorems (plus, for the two-parameter cases, 13 more); each depends only on
   `propext`, `Classical.choice` and `Quot.sound`. The CI checks this on every push.
 
 | namespace | lattice | paper | `V` | entries | kernel time (1 core) |
@@ -46,7 +46,22 @@ The extension `LeanResidy/X/` (generic over the coefficient model, see §7 of `S
 | `X.C3122t` | 3.12², conductance `t` on dodecagon–dodecagon edges, **all** `t ≠ 0, −3/2` | [E3] | 6 | 36 | ~20 min | ~6 GB |
 | `X.C488u` | 4.8², conductances `(1 − c, 2c)`, `c = cos θ_t`, **all** `u = e^{iθ_t}` | [E3] | 4 | 16 | ~40 min | ~13.5 GB |
 
-Not included: the families with two independent conductance ratios (too heavy for the kernel with this method).
+The families with **two** independent conductance ratios use a new coefficient model (§8 of `STATEMENTS.md`):
+a polynomial in the two parameters is packed into four big integers (Kronecker substitution,
+`X/Kron.lean`), so the kernel only does a few GMP multiplications per operation; the polynomial itself is
+carried along as a delayed "ghost" with a proof that the packed numbers, an ℓ¹ coefficient bound and a degree
+bound agree with it, and `kron_zero` shows that a packed value 0 with small coefficients forces the polynomial
+to vanish. Denominators are products of a fixed list `Dl` of factors (`X/FrG.lean`).
+
+| namespace | lattice | paper | `V` | entries | kernel time (1 core) | peak memory |
+|---|---|---|---|---|---|---|
+| `X.Cf2awK` | [3².6²; 3.6.3.6], **all** conductances (parameters `a = P₁`, `b = P₂`) | [E3] | 3 | 9 | ~1.5 min | ~3 GB |
+| `X.Cf2bwK` | [3.4.3.12; 3.12²], **all** conductances (parameters `u`, `r`) | [E3] | 8 | 64 | ~9 min | ~5 GB |
+
+The theorems hold for all parameter values at which no factor of `Dl` vanishes; `X/KronSanityUnit.lean` shows
+that this includes the whole physical region (`f2a_hD_unit`, `f2b_hD_unit`). The data for these two cases
+were produced by exact interpolation of the residue computation on a grid (`genk/`); Lean does not rely on
+the interpolation.
 
 ## How it works
 
