@@ -140,3 +140,17 @@ import LeanResidy
 #print axioms LeanResidy.X.C488u.pfin_zero_simple
 #print axioms LeanResidy.X.C488u.hu_unit
 #print axioms LeanResidy.X.C488u.hQ_unit
+-- Two-parameter cases (Kronecker model), LeanResidy/X/Kron.lean, FrG.lean, Case*K.lean
+#print axioms LeanResidy.X.kron_zero
+#print axioms LeanResidy.X.PK.sound
+#print axioms LeanResidy.X.FrG.sound
+#print axioms LeanResidy.X.Cf2awK.adjugate
+#print axioms LeanResidy.X.Cf2awK.curve
+#print axioms LeanResidy.X.Cf2awK.partial_fractions
+#print axioms LeanResidy.X.Cf2awK.hD_satisfiable
+#print axioms LeanResidy.X.Cf2bwK.adjugate
+#print axioms LeanResidy.X.Cf2bwK.curve
+#print axioms LeanResidy.X.Cf2bwK.partial_fractions
+#print axioms LeanResidy.X.Cf2bwK.hD_satisfiable
+#print axioms LeanResidy.X.KronUnit.f2a_hD_unit
+#print axioms LeanResidy.X.KronUnit.f2b_hD_unit

@@ -19,7 +19,8 @@ jobs:
       - name: Build the cases one at a time (the kernel computations need up to 10 GB, 4.8² with weights about 13.5 GB)
         run: |
           for m in Points SanityBase Casekagome Case3342 Case488 Case3122 Casef2b Case3 Case346 Case4612 \
-              X.SanityBase X.Casef2a X.Case3122t X.Case488u X.Sanity X.Sanityf2a X.Sanity3122t X.Sanity488u; do
+              X.SanityBase X.Casef2a X.Case3122t X.Case488u X.Sanity X.Sanityf2a X.Sanity3122t X.Sanity488u \
+              X.Casef2awK X.Casef2bwK X.KronSanityUnit; do
             echo "::group::$m"; lake build LeanResidy.$m; echo "::endgroup::"
           done
           lake build
